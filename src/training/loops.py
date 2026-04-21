@@ -35,8 +35,9 @@ def basic_training_loop(
     loop_cfg: LoopConfig,
     *,
     tokenizer: _TokenizerLike | None = None,
+    start_step: int = 0,
 ) -> None:
-    """Run ``train_step`` until ``loop_cfg.max_steps``.
+    """Run ``train_step`` from ``start_step`` until ``loop_cfg.max_steps``.
 
     Streaming loaders may never exhaust, so re-``iter`` on ``StopIteration``.
     Logs an EMA of ``lm``/``total`` and checkpoints every ``loop_cfg.ckpt_every``
@@ -44,6 +45,11 @@ def basic_training_loop(
 
     If ``loop_cfg.sample_every > 0``, a ``tokenizer`` must be supplied so the
     loop can generate text from ``loop_cfg.sample_prompts`` at that cadence.
+
+    ``start_step`` is the step count *already completed* by a prior run — pass
+    the return value of :func:`load_checkpoint` here so cadence checks
+    (``log_every`` / ``ckpt_every`` / ``sample_every``) stay aligned across
+    resumes.
     """
     device = torch.device(train_cfg.device)
     model.train()
@@ -53,8 +59,17 @@ def basic_training_loop(
         raise RuntimeError(
             "sample_every > 0 but no tokenizer was passed to basic_training_loop"
         )
+    if start_step < 0:
+        raise ValueError(f"start_step must be >= 0, got {start_step}")
+    if start_step >= loop_cfg.max_steps:
+        print(
+            f"[train] start_step ({start_step}) >= max_steps "
+            f"({loop_cfg.max_steps}); nothing to do.",
+            flush=True,
+        )
+        return
 
-    _print_banner(model, device, train_cfg, loop_cfg)
+    _print_banner(model, device, train_cfg, loop_cfg, start_step=start_step)
 
     ckpt_dir = Path(loop_cfg.ckpt_dir)
     if loop_cfg.ckpt_every > 0:
@@ -64,7 +79,7 @@ def basic_training_loop(
     ema_total: float | None = None
     alpha = 0.1  # EMA smoothing factor
 
-    step = 0
+    step = start_step
     data_iter = iter(dataloader)
 
     while step < loop_cfg.max_steps:
@@ -162,6 +177,35 @@ def _save_checkpoint(
     print(f"[ckpt] saved {path}", flush=True)
 
 
+def find_latest_checkpoint(ckpt_dir: str | Path) -> Path | None:
+    """Return the newest ``step_*.pt`` in ``ckpt_dir`` or ``None``."""
+    p = Path(ckpt_dir)
+    if not p.exists():
+        return None
+    matches = sorted(p.glob("step_*.pt"))
+    return matches[-1] if matches else None
+
+
+def load_checkpoint(
+    path: str | Path,
+    model: MoELM,
+    optimizer: Optimizer,
+    scheduler: LRScheduler,
+    scaler: GradScaler,
+    *,
+    device: torch.device | str = "cpu",
+) -> int:
+    """Restore ``model/optimizer/scheduler/scaler`` state and return the step."""
+    blob = torch.load(Path(path), map_location=device, weights_only=False)
+    model.load_state_dict(blob["model"])
+    optimizer.load_state_dict(blob["optimizer"])
+    scheduler.load_state_dict(blob["scheduler"])
+    scaler.load_state_dict(blob["scaler"])
+    step = int(blob["step"])
+    print(f"[ckpt] resumed from {path} at step {step}", flush=True)
+    return step
+
+
 def _sample_and_log(
     model: MoELM,
     tokenizer: _TokenizerLike,
@@ -212,14 +256,17 @@ def _print_banner(
     device: torch.device,
     train_cfg: TrainStepConfig,
     loop_cfg: LoopConfig,
+    *,
+    start_step: int = 0,
 ) -> None:
     n_params = sum(p.numel() for p in model.parameters())
     n_trainable = sum(p.numel() for p in model.parameters() if p.requires_grad)
+    resume = f"  resume_from={start_step}" if start_step > 0 else ""
     print(
         f"[train] device={device}  autocast={train_cfg.use_autocast}/"
         f"{train_cfg.autocast_dtype}  params={n_params:,}  "
         f"trainable={n_trainable:,}  max_steps={loop_cfg.max_steps}  "
-        f"seed={loop_cfg.seed}  ckpt_every={loop_cfg.ckpt_every}",
+        f"seed={loop_cfg.seed}  ckpt_every={loop_cfg.ckpt_every}{resume}",
         flush=True,
     )
     print(

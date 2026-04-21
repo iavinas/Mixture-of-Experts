@@ -39,7 +39,11 @@ from data.loaders import build_packed_lm_dataloader, load_tokenizer
 from moe.models.config import MoELMConfig
 from moe.models.moe_stack import build_moe_lm
 from training.config import LoopConfig, OptimizerConfig, TrainStepConfig
-from training.loops import basic_training_loop
+from training.loops import (
+    basic_training_loop,
+    find_latest_checkpoint,
+    load_checkpoint,
+)
 
 
 def load_experiment(path: Path) -> dict:
@@ -93,6 +97,17 @@ def main() -> None:
         type=int,
         default=None,
         help="Override training.max_steps for quick debugging",
+    )
+    parser.add_argument(
+        "--resume",
+        type=Path,
+        default=None,
+        help="Resume from a specific checkpoint file (.pt).",
+    )
+    parser.add_argument(
+        "--resume-latest",
+        action="store_true",
+        help="Resume from the newest checkpoint in training.ckpt_dir, if any.",
     )
     args = parser.parse_args()
 
@@ -154,6 +169,28 @@ def main() -> None:
     grad_device = "cuda" if device.type == "cuda" else "cpu"
     scaler = GradScaler(grad_device, enabled=scaler_enabled)
 
+    # Resolve resume source: explicit path wins, then --resume-latest scans
+    # the configured ckpt_dir. Load before training so optimizer/scheduler
+    # state is in place on the target device.
+    resume_path: Path | None = None
+    if args.resume is not None:
+        resume_path = args.resume
+    elif args.resume_latest:
+        resume_path = find_latest_checkpoint(loop_cfg.ckpt_dir)
+        if resume_path is None:
+            print(
+                f"[ckpt] --resume-latest: no checkpoints in {loop_cfg.ckpt_dir}, "
+                f"starting from scratch.",
+                flush=True,
+            )
+
+    start_step = 0
+    if resume_path is not None:
+        model.to(device)
+        start_step = load_checkpoint(
+            resume_path, model, optimizer, scheduler, scaler, device=device
+        )
+
     basic_training_loop(
         model,
         dataloader,
@@ -163,6 +200,7 @@ def main() -> None:
         train_cfg,
         loop_cfg,
         tokenizer=tokenizer,
+        start_step=start_step,
     )
 
 

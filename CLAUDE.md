@@ -64,6 +64,8 @@ Losses in `moe/losses/`:
 
 **Periodic qualitative sampling**: `training.sample_every` (0 disables) triggers `_sample_and_log` every N steps — it runs `MoELM.generate` on each string in `training.sample_prompts`, decodes `sample_new_tokens` continuations, and prints `[sample step …] prompt=… cont=…`. The loop reuses `build_autocast_ctx` from `training/trainer.py` so sampling precision matches training. The tokenizer is threaded from `scripts/train.py`; the loop raises at startup if `sample_every > 0` without one. `MoELM.generate` only sets `.eval()`, so the sampler saves/restores `model.training` itself.
 
+**Resume**: `scripts/train.py --resume <file.pt>` loads an explicit checkpoint; `--resume-latest` scans `training.ckpt_dir` for the newest `step_*.pt`. Resume restores model/optimizer/scheduler/scaler state and the step counter, and `basic_training_loop` accepts the returned `start_step` so `log_every`/`ckpt_every`/`sample_every` cadence stays aligned. The Makefile exposes `RESUME=<path>` and `RESUME_LATEST=1`.
+
 ### `data/` — TinyStories packed LM loader
 
 `PackedTinyStories` (`data/packed_streaming.py`) is an `IterableDataset` that streams/loads a HF dataset, tokenizes with a `tokenizers.Tokenizer`, appends an `end_of_text_token`, and yields fixed-length `(input_ids, target_ids)` chunks where `target = input` shifted by one. Under multi-worker DataLoader it **shards the dataset per worker** (`ds.shard(num_workers, worker_id)`) to avoid duplicate chunks.
