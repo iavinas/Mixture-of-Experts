@@ -1,0 +1,11 @@
+# TinyStories → packed (input, target) chunks for LM training.
+# Loaded by: StreamingPackedDataConfig.from_yaml(...)
+# streaming: false caches the split; true streams from the Hub.
+dataset_name: roneneldan/TinyStories
+split: train
+text_column: text
+tokenizer_name_or_path: gpt2
+seq_len: 512
+end_of_text_token: "<|endoftext|>"
+trust_remote_code: false
+streaming: false

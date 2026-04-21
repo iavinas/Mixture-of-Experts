@@ -1,0 +1,52 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+.Python
+*.egg-info/
+.eggs/
+dist/
+build/
+*.egg
+.venv/
+venv/
+.env
+.env.*
+
+# Jupyter
+.ipynb_checkpoints/
+
+# ML artifacts (checkpoints only; add tensorboard/wandb dirs when needed)
+artifacts/checkpoints/*
+!artifacts/checkpoints/.gitkeep
+wandb/
+mlruns/
+checkpoints/
+logs/
+*.pt
+*.pth
+*.ckpt
+*.safetensors
+
+# Data (keep structure, ignore blobs)
+data/raw/*
+!data/raw/.gitkeep
+data/processed/*
+!data/processed/.gitkeep
+
+# IDE / OS
+.DS_Store
+.idea/
+.vscode/
+*.swp
+
+# Testing / coverage
+.coverage
+htmlcov/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+
+# Hydra / config outputs
+multirun/
+outputs/

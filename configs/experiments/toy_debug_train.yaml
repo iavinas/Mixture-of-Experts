@@ -1,0 +1,73 @@
+# Local Mac smoke test: GPT-2 tokenizer (vocab 50257 from train.py), tiny MoELM.
+# Needs network once for TinyStories stream + tokenizer download.
+#
+#   make train
+#   make train TRAIN_ARGS='--max-steps 20'
+
+data:
+  dataset_name: roneneldan/TinyStories
+  split: train
+  text_column: text
+  # GPT-2 BPE; train.py sets model vocab_size from this tokenizer.
+  tokenizer_name_or_path: gpt2
+  seq_len: 510
+  end_of_text_token: "<|endoftext|>"
+  trust_remote_code: false
+  # false = download/cache split (Hub cache); true = stream without full download.
+  streaming: false
+
+dataloader:
+  batch_size: 2
+  num_workers: 0
+  pin_memory: false
+  persistent_workers: false
+  prefetch_factor: 2
+  drop_last: true
+
+# vocab_size ignored at runtime — overwritten from GPT-2 (50257).
+model:
+  vocab_size: 50257
+  d_model: 64
+  n_heads: 4
+  d_ff: 256
+  n_layers: 6
+  n_experts: 4
+  k: 2
+  n_shared: 1
+  # Must be >= data.seq_len (RoPE / position limit).
+  max_seq_len: 512
+  rope_base: 10000.0
+
+train_step:
+  load_balance_weight: 0.01
+  router_z_weight: 0.001
+  grad_clip: 1.0
+  # cpu | mps (Apple GPU) | cuda — mps needs PyTorch built with MPS; float32 + no autocast is safest.
+  device: mps
+  autocast_dtype: float32
+  use_autocast: false
+
+optimizer:
+  lr: 0.0003
+  weight_decay: 0.01
+  betas: [0.9, 0.95]
+  warmup_steps: 50
+  min_lr_ratio: 0.1
+
+training:
+  max_steps: 1000
+  log_every: 5
+  seed: 0
+  # Checkpointing off for the local smoke run; enable on GPU runs.
+  ckpt_every: 0
+  ckpt_dir: artifacts/checkpoints
+  ckpt_keep_last: 3
+  # Sampling off locally; flip sample_every to a small int to smoke-test.
+  sample_every: 500
+  sample_prompts:
+    - "Once upon a time"
+    - "The little girl"
+    - "In a forest far away"
+  sample_new_tokens: 16
+  sample_temperature: 1.0
+  sample_top_k: 50

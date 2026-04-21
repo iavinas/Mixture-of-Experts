@@ -1,0 +1,18 @@
+# One file: model training can load ``data`` + ``dataloader`` together.
+data:
+  dataset_name: roneneldan/TinyStories
+  split: train
+  text_column: text
+  tokenizer_name_or_path: gpt2
+  seq_len: 512
+  end_of_text_token: "<|endoftext|>"
+  trust_remote_code: false
+  streaming: false
+
+dataloader:
+  batch_size: 32
+  num_workers: 0
+  pin_memory: false
+  persistent_workers: false
+  prefetch_factor: 2
+  drop_last: true

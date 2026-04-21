@@ -1,0 +1,8 @@
+# PyTorch DataLoader for iterable packed LM streams.
+# Loaded by: DataLoaderConfig.from_yaml(...)
+batch_size: 32
+num_workers: 0
+pin_memory: false
+persistent_workers: false
+prefetch_factor: 2
+drop_last: true

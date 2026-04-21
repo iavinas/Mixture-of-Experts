@@ -1,0 +1,68 @@
+# GPU run (CUDA + bfloat16). Starting point for GCP — tune batch_size / n_layers
+# / d_model once you have your first nvidia-smi memory reading.
+#
+#   make train TRAIN_CONFIG=configs/experiments/gpu_train.yaml
+
+data:
+  dataset_name: roneneldan/TinyStories
+  split: train
+  text_column: text
+  tokenizer_name_or_path: gpt2
+  seq_len: 512
+  end_of_text_token: "<|endoftext|>"
+  trust_remote_code: false
+  # false caches the split on disk after first download; good for repeated runs.
+  streaming: false
+
+dataloader:
+  batch_size: 32
+  num_workers: 4
+  pin_memory: true
+  persistent_workers: true
+  prefetch_factor: 4
+  drop_last: true
+
+# vocab_size overwritten at runtime from the GPT-2 tokenizer (50257).
+model:
+  vocab_size: 50257
+  d_model: 256
+  n_heads: 4
+  d_ff: 1024
+  n_layers: 6
+  n_experts: 8
+  k: 2
+  n_shared: 1
+  max_seq_len: 512
+  rope_base: 10000.0
+
+train_step:
+  load_balance_weight: 0.01
+  router_z_weight: 0.001
+  grad_clip: 1.0
+  device: cuda
+  autocast_dtype: bfloat16
+  use_autocast: true
+
+optimizer:
+  lr: 0.0003
+  weight_decay: 0.01
+  betas: [0.9, 0.95]
+  warmup_steps: 500
+  min_lr_ratio: 0.1
+
+training:
+  max_steps: 20000
+  log_every: 50
+  seed: 0
+  ckpt_every: 2000
+  ckpt_dir: artifacts/checkpoints
+  ckpt_keep_last: 3
+  # Qualitative sampling during training — set sample_every: 0 to disable.
+  sample_every: 500
+  sample_prompts:
+    - "Once upon a time"
+    - "The little girl"
+    - "In a forest far away"
+  sample_new_tokens: 16
+  sample_temperature: 1.0
+  sample_top_k: 50
