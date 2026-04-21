@@ -62,6 +62,9 @@ training:
   ckpt_every: 0
   ckpt_dir: artifacts/checkpoints
   ckpt_keep_last: 3
+  # auto = resume from newest ckpt in ckpt_dir if present, else start fresh.
+  # never = always start fresh. CLI --fresh / --resume / --resume-latest override.
+  resume: auto
   # Sampling off locally; flip sample_every to a small int to smoke-test.
   sample_every: 500
   sample_prompts:

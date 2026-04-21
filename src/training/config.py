@@ -48,6 +48,10 @@ class LoopConfig:
     ckpt_every: int = 0  # 0 disables checkpointing
     ckpt_dir: str = "artifacts/checkpoints"
     ckpt_keep_last: int = 3  # keep only the N most recent step checkpoints
+    # "auto" = resume from newest ckpt in ckpt_dir if present, else start fresh;
+    # "never" = always start fresh even if checkpoints exist.
+    # CLI --fresh / --resume / --resume-latest override this value.
+    resume: Literal["auto", "never"] = "auto"
     # Qualitative sampling during training. 0 disables; anything else requires
     # sample_prompts to be non-empty.
     sample_every: int = 0
@@ -82,6 +86,8 @@ class LoopConfig:
             raise ValueError(
                 f"sample_top_k must be None or >= 1, got {self.sample_top_k}"
             )
+        if self.resume not in ("auto", "never"):
+            raise ValueError(f"resume must be 'auto' or 'never', got {self.resume!r}")
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> LoopConfig:

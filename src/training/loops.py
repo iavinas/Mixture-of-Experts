@@ -134,15 +134,16 @@ def _log_step(
 ) -> None:
     lm = metrics["lm"]
     total = metrics["total"]
-    aux = metrics["aux"]
-    aux_n = metrics["aux_norm"]
-    z = metrics["z"]
+    aux_norm = metrics["aux_norm"]
+    router_z = metrics["z"]
     lr = optimizer.param_groups[0]["lr"]
+    # Width of max_steps so the step column stays aligned as it grows.
+    w = len(str(max_steps))
     print(
-        f"step {step}/{max_steps}  lr={lr:.2e}  "
-        f"lm={lm:.4f} (ema {ema_lm:.4f})  "
-        f"aux={aux:.4f}  aux_n={aux_n:.4f}  "
-        f"z={z:.4f}  total={total:.4f} (ema {ema_total:.4f})",
+        f"step {step:>{w}}/{max_steps}  lr {lr:.2e}  |  "
+        f"lm_loss {lm:7.4f} (ema {ema_lm:7.4f})  "
+        f"total_loss {total:7.4f} (ema {ema_total:7.4f})  |  "
+        f"aux_norm {aux_norm:.4f}  router_z {router_z:6.3f}",
         flush=True,
     )
 
@@ -270,8 +271,9 @@ def _print_banner(
         flush=True,
     )
     print(
-        "[train] load_balance_loss is aux_n=1.0 at perfect uniform routing "
-        "(minimum is k per layer, we normalize by n_moe_layers * k).",
+        "[train] log fields: lm_loss=cross-entropy; total_loss=lm+aux+z weighted; "
+        "aux_norm=load_balance_loss normalized so 1.0=uniform routing across "
+        "experts (higher = expert collapse); router_z=ST-MoE router z-loss.",
         flush=True,
     )
     if loop_cfg.sample_every > 0:

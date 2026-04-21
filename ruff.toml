@@ -14,6 +14,7 @@ select = [
 # `sys.path` must be adjusted before first-party imports.
 "scripts/train.py" = ["E402"]
 "scripts/pretokenize.py" = ["E402"]
+"scripts/evaluate.py" = ["E402"]
 
 [format]
 quote-style = "double"

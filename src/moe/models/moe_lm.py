@@ -40,7 +40,7 @@ class MoELM(nn.Module):
                     n_experts,
                     k,
                     n_shared,
-                    use_moe=(layer_idx % 2 == 1),
+                    use_moe=True,
                 )
                 for layer_idx in range(n_layers)
             ]

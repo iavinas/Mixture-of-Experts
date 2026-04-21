@@ -57,6 +57,11 @@ training:
   ckpt_every: 2000
   ckpt_dir: artifacts/checkpoints
   ckpt_keep_last: 3
+  # auto = resume from newest ckpt in ckpt_dir if present, else start fresh.
+  # Critical on preemptible VMs: re-running the same command after preemption
+  # will pick up from the last checkpoint instead of starting over.
+  # Override with: --fresh (ignore) or --resume/--resume-latest (force).
+  resume: auto
   # Qualitative sampling during training — set sample_every: 0 to disable.
   sample_every: 500
   sample_prompts:

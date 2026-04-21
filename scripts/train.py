@@ -107,7 +107,13 @@ def main() -> None:
     parser.add_argument(
         "--resume-latest",
         action="store_true",
-        help="Resume from the newest checkpoint in training.ckpt_dir, if any.",
+        help="Force resume from the newest checkpoint in training.ckpt_dir.",
+    )
+    parser.add_argument(
+        "--fresh",
+        action="store_true",
+        help="Ignore existing checkpoints and start from scratch "
+        "(overrides training.resume='auto').",
     )
     args = parser.parse_args()
 
@@ -169,20 +175,42 @@ def main() -> None:
     grad_device = "cuda" if device.type == "cuda" else "cpu"
     scaler = GradScaler(grad_device, enabled=scaler_enabled)
 
-    # Resolve resume source: explicit path wins, then --resume-latest scans
-    # the configured ckpt_dir. Load before training so optimizer/scheduler
-    # state is in place on the target device.
+    # Resolve resume source. Precedence (first match wins):
+    #   1. --fresh                       → always start from scratch
+    #   2. --resume <path>               → load that file
+    #   3. --resume-latest               → newest in ckpt_dir (error if none)
+    #   4. training.resume == "auto"     → newest in ckpt_dir if any, else fresh
+    #   5. training.resume == "never"    → fresh
     resume_path: Path | None = None
-    if args.resume is not None:
+    if args.fresh:
+        print("[ckpt] --fresh: ignoring any existing checkpoints.", flush=True)
+    elif args.resume is not None:
         resume_path = args.resume
     elif args.resume_latest:
         resume_path = find_latest_checkpoint(loop_cfg.ckpt_dir)
         if resume_path is None:
+            raise SystemExit(
+                f"--resume-latest: no checkpoints found in {loop_cfg.ckpt_dir}"
+            )
+    elif loop_cfg.resume == "auto":
+        resume_path = find_latest_checkpoint(loop_cfg.ckpt_dir)
+        if resume_path is None:
             print(
-                f"[ckpt] --resume-latest: no checkpoints in {loop_cfg.ckpt_dir}, "
+                f"[ckpt] resume='auto' but no checkpoints in {loop_cfg.ckpt_dir}; "
                 f"starting from scratch.",
                 flush=True,
             )
+        else:
+            print(
+                f"[ckpt] resume='auto': found {resume_path.name} "
+                f"in {loop_cfg.ckpt_dir}.",
+                flush=True,
+            )
+    else:  # resume == "never"
+        print(
+            "[ckpt] resume='never': starting from scratch even if checkpoints exist.",
+            flush=True,
+        )
 
     start_step = 0
     if resume_path is not None:
